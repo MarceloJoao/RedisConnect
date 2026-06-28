@@ -2,6 +2,7 @@ package br.com.redisconnect.redisconnect.controller;
 
 import br.com.redisconnect.redisconnect.model.User;
 import br.com.redisconnect.redisconnect.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +20,7 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<User> save(@RequestBody User user) {
+    public ResponseEntity<User> save(@Valid @RequestBody User user) {
         userService.save(user);
         // Retorna 201 Created
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
@@ -41,10 +42,10 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public User update(@PathVariable String id, @RequestBody User user) {
+    public ResponseEntity<User> update(@PathVariable String id, @Valid @RequestBody User user) {
         user.setId(id);
         userService.update(user);
-        return user;
+        return ResponseEntity.ok(user);
     }
 
     @DeleteMapping("/{id}")
