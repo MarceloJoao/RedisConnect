@@ -140,7 +140,6 @@ public class UserRepository {
         redisTemplate.delete(PREFIX_EMAIL + user.getEmail());
 
         // Remove o ID do Set global.
-        // Redis: SREM users:ids {id}
         redisTemplate.opsForSet().remove(USER_IDS_SET, id);
     }
 }

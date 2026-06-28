@@ -199,11 +199,20 @@
             document.getElementById('chat-page').classList.remove('hidden');
             document.getElementById('room-title').innerText = "Sala: " + currentRoomId;
 
+            // 1. Carrega o histórico salvo no Redis antes de escutar novas mensagens
+            fetch('/messages/' + currentRoomId)
+                .then(res => res.json())
+                .then(history => {
+                    history.forEach(msg => showMessage(msg, true));
+                });
+
+            // 2. Assina o tópico para receber mensagens em tempo real
             currentSubscription = stompClient.subscribe('/topic/' + currentRoomId, function (msg) {
-                showMessage(JSON.parse(msg.body));
+                showMessage(JSON.parse(msg.body), false);
             });
         });
     }
+
 
     function sendMessage() {
         var content = document.getElementById('message').value.trim();
@@ -216,13 +225,16 @@
         document.getElementById('message').focus();
     }
 
-    function showMessage(msg) {
+    function showMessage(msg, isHistory) {
         var li = document.createElement('li');
-        li.innerHTML = "<strong>" + msg.senderId + ":</strong> " + msg.content;
+        var time = msg.timestamp ? ' <small style="color:#aaa;">' + msg.timestamp.substring(11, 16) + '</small>' : '';
+        li.innerHTML = "<strong>" + msg.senderId + ":</strong> " + msg.content + time;
+        if (isHistory) li.style.cssText = "color:#888; font-style:italic;";
         var ul = document.getElementById('messages');
         ul.appendChild(li);
         ul.scrollTop = ul.scrollHeight;
     }
+
 
     function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
 

@@ -1,8 +1,6 @@
 package br.com.redisconnect.redisconnect.model;
 
 import lombok.*;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -15,6 +13,5 @@ public class ChatMessage {
     private String roomId;
     private String senderId;
     private String content;
-    private LocalDate timestamp;
-    private LocalDateTime createdAt;
+    private String timestamp;
 }
