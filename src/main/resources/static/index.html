@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>RedisConnect - Autenticação e Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .hidden { display: none; }
+        input { padding: 10px; margin: 8px 0; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold;}
+        button:hover { background: #218838; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-primary { background: #007bff; }
+        .btn-primary:hover { background: #0056b3; }
+        ul { list-style: none; padding: 0; min-height: 250px; border: 1px solid #ddd; background: #fafafa; border-radius: 4px; overflow-y: auto; margin-top: 15px;}
+        li { padding: 8px; border-bottom: 1px solid #eee; }
+        .my-msg { color: #0056b3; font-weight: bold; }
+        .error-msg { color: #dc3545; font-size: 0.9em; margin-top: -5px; margin-bottom: 10px; display: none; }
+        .link-text { color: #007bff; cursor: pointer; text-decoration: underline; font-size: 0.9em; text-align: center; display: block; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="text-align: center;">RedisConnect</h2>
+
+    <div id="login-step">
+        <h3>Faça seu Login</h3>
+        <input type="email" id="emailInput" placeholder="Seu E-mail" />
+        <input type="password" id="passwordInput" placeholder="Sua Senha" />
+        <span id="loginError" class="error-msg">E-mail ou senha incorretos!</span>
+        <button onclick="realizarLogin()">Entrar</button>
+        <span class="link-text" onclick="toggleAuthScreens('register')">Não tem conta? Cadastre-se aqui</span>
+    </div>
+
+    <div id="register-step" class="hidden">
+        <h3>Novo Cadastro</h3>
+        <input type="text" id="regName" placeholder="Seu Nome Completo" />
+        <input type="email" id="regEmail" placeholder="Seu E-mail" />
+        <input type="password" id="regPassword" placeholder="Crie uma Senha" />
+        <button onclick="cadastrarUsuario()" class="btn-primary">Criar Conta</button>
+        <span class="link-text" onclick="toggleAuthScreens('login')">Já possui conta? Faça Login</span>
+    </div>
+
+    <div id="room-step" class="hidden">
+        <h3>Bem-vindo(a), <span id="displayUserName" style="color: #28a745;"></span>!</h3>
+        <label style="font-weight: bold;">Escolha o Tópico/Sala:</label>
+        <input type="text" id="roomId" placeholder="Ex: dev-java" />
+        <button onclick="connectToRoom()">Conectar na Sala</button>
+    </div>
+
+    <div id="chat-page" class="hidden">
+        <h3 id="room-title"></h3>
+        <ul id="messages"></ul>
+        <input type="text" id="message" placeholder="Digite a mensagem..." onkeypress="handleEnter(event)" />
+        <button onclick="sendMessage()">Enviar Mensagem</button>
+        <button onclick="disconnect()" class="btn-danger">Sair da Sala</button>
+    </div>
+</div>
+
+<script>
+    var stompClient = null;
+    var currentUsername = null;
+    var currentRoomId = null;
+    var currentSubscription = null;
+
+    function toggleAuthScreens(target) {
+        document.getElementById('loginError').style.display = 'none';
+        if (target === 'register') {
+            document.getElementById('login-step').classList.add('hidden');
+            document.getElementById('register-step').classList.remove('hidden');
+        } else {
+            document.getElementById('register-step').classList.add('hidden');
+            document.getElementById('login-step').classList.remove('hidden');
+        }
+    }
+
+    function cadastrarUsuario() {
+        var newUser = {
+            name: document.getElementById('regName').value.trim(),
+            email: document.getElementById('regEmail').value.trim(),
+            password: document.getElementById('regPassword').value.trim()
+        };
+
+        fetch('/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newUser)
+        }).then(res => {
+            if (res.ok) {
+                alert("Cadastro realizado!");
+                toggleAuthScreens('login');
+            } else { alert("Erro ao cadastrar."); }
+        });
+    }
+
+    function realizarLogin() {
+        var loginData = {
+            email: document.getElementById('emailInput').value.trim(),
+            password: document.getElementById('passwordInput').value.trim()
+        };
+
+        fetch('/users/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(loginData)
+        })
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error();
+            })
+            .then(user => {
+                currentUsername = user.name;
+                document.getElementById('login-step').classList.add('hidden');
+                document.getElementById('room-step').classList.remove('hidden');
+                document.getElementById('displayUserName').innerText = currentUsername;
+            })
+            .catch(() => {
+                document.getElementById('loginError').style.display = 'block';
+            });
+    }
+
+    function connectToRoom() {
+        currentRoomId = document.getElementById('roomId').value.trim();
+        if (!currentRoomId) return;
+
+        if (currentSubscription !== null) currentSubscription.unsubscribe();
+        document.getElementById('messages').innerHTML = '';
+
+        var socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function () {
+            document.getElementById('room-step').classList.add('hidden');
+            document.getElementById('chat-page').classList.remove('hidden');
+            document.getElementById('room-title').innerText = "Sala: " + currentRoomId;
+
+            currentSubscription = stompClient.subscribe('/topic/' + currentRoomId, function (msg) {
+                showMessage(JSON.parse(msg.body));
+            });
+        });
+    }
+
+    function sendMessage() {
+        var content = document.getElementById('message').value.trim();
+        if (!content) return;
+        var chatMessage = { senderId: currentUsername, content: content, roomId: currentRoomId };
+        stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+        document.getElementById('message').value = '';
+    }
+
+    function showMessage(msg) {
+        var li = document.createElement('li');
+        li.innerHTML = "<strong>" + msg.senderId + ":</strong> " + msg.content;
+        var ul = document.getElementById('messages');
+        ul.appendChild(li);
+        ul.scrollTop = ul.scrollHeight;
+    }
+
+    function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
+
+    function disconnect() {
+        if (currentSubscription !== null) currentSubscription.unsubscribe();
+        document.getElementById('chat-page').classList.add('hidden');
+        document.getElementById('room-step').classList.remove('hidden');
+        document.getElementById('messages').innerHTML = '';
+    }
+</script>
+
+</body>
+</html>

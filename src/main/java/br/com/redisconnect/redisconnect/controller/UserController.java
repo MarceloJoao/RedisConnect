@@ -10,20 +10,15 @@ import java.util.List;
 @RequestMapping("/users")
 public class UserController {
 
-    // Camada responsável pelas regras de negócio dos usuários.
     private final UserService userService;
 
-    // O Spring injeta automaticamente o UserService.
     public UserController(UserService userService) {
         this.userService = userService;
     }
 
-    // Endpoint responsável por cadastrar um novo usuário.
     @PostMapping
     public User save(@RequestBody User user) {
-        // Envia o usuário para a camada de serviço.
         userService.save(user);
-        // Retorna o usuário cadastrado.
         return user;
     }
 
@@ -32,28 +27,37 @@ public class UserController {
         return userService.findById(id);
     }
 
-    // Busca um usuário pelo e-mail.
     @GetMapping("/email/{email}")
     public User findByEmail(@PathVariable String email) {
         return userService.findByEmail(email);
     }
 
-    // Lista todos os usuários.
     @GetMapping
     public List<User> findAll() {
         return userService.findAll();
     }
 
-    // Atualiza um usuário.
     @PutMapping("/{id}")
     public User update(@PathVariable String id, @RequestBody User user) {
         user.setId(id);
         userService.update(user);
         return user;
     }
-    // Exclui um usuário.
+
     @DeleteMapping("/{id}")
     public void delete(@PathVariable String id) {
         userService.delete(id);
+    }
+
+    // Endpoint responsável por validar o Login
+    @PostMapping("/login")
+    public org.springframework.http.ResponseEntity<?> login(@RequestBody User loginData) {
+        User user = userService.findByEmail(loginData.getEmail());
+
+        if (user != null && user.getPassword().equals(loginData.getPassword())) {
+            return org.springframework.http.ResponseEntity.ok(user);
+        }
+
+        return org.springframework.http.ResponseEntity.status(401).body("E-mail ou senha incorretos.");
     }
 }
