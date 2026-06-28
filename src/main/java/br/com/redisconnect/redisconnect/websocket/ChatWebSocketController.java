@@ -8,8 +8,6 @@ import org.springframework.stereotype.Controller;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-
-
 @Controller
 public class ChatWebSocketController {
 
@@ -19,14 +17,11 @@ public class ChatWebSocketController {
         this.chatService = chatService;
     }
 
+    // recebe mensagens do cliente via WebSocket e as envia para o ChatService
     @MessageMapping("/chat.sendMessage")
     public void sendMessage(ChatMessage chatMessage) {
-
-        // O backend define o ID único e o timestamp exato da mensagem
-        chatMessage.setId(UUID.randomUUID().toString());
-        chatMessage.setTimestamp(LocalDateTime.now().toString());
-
-        // Salva no histórico (Redis List) e entrega em tempo real (Pub/Sub)
+        chatMessage.setId(UUID.randomUUID().toString()); // ID único gerado pelo backend
+        chatMessage.setTimestamp(LocalDateTime.now().toString()); // timestamp gerado pelo backend
         chatService.send(chatMessage);
     }
 }

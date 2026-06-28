@@ -106,9 +106,18 @@
 
     <div id="room-step" class="hidden">
         <h3>Bem-vindo(a), <span id="displayUserName" style="color: #28a745;"></span>!</h3>
-        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Escolha o Tópico/Sala:</label>
-        <input type="text" id="roomId" placeholder="Ex: dev-java" />
-        <button onclick="connectToRoom()">Conectar na Sala</button>
+
+        <!-- Lista de salas disponíveis -->
+        <label style="font-weight: bold; display: block; margin-bottom: 8px;">Salas disponíveis:</label>
+        <div id="rooms-list" style="border:1px solid #ddd; border-radius:4px; background:#fafafa; min-height:80px; padding:8px; margin-bottom:12px;">
+            <p id="rooms-loading" style="color:#888; margin:0;">Carregando salas...</p>
+        </div>
+
+        <!-- Formulário para criar nova sala -->
+        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Criar nova sala:</label>
+        <input type="text" id="newRoomName" placeholder="Nome da sala (ex: dev-java)" />
+        <input type="text" id="newRoomDesc" placeholder="Descrição (opcional)" />
+        <button onclick="criarSala()" class="btn-primary">+ Criar Sala</button>
     </div>
 
     <div id="chat-page" class="hidden">
@@ -176,16 +185,67 @@
                 document.getElementById('login-step').classList.add('hidden');
                 document.getElementById('room-step').classList.remove('hidden');
                 document.getElementById('displayUserName').innerText = currentUsername;
+                carregarSalas(); // carrega a lista de salas após login
             })
             .catch(() => {
                 document.getElementById('loginError').style.display = 'block';
             });
     }
 
-    function connectToRoom() {
-        currentRoomId = document.getElementById('roomId').value.trim();
-        if (!currentRoomId) return;
+    // Busca as salas no backend e renderiza na tela
+    function carregarSalas() {
+        fetch('/rooms')
+            .then(res => res.json())
+            .then(rooms => {
+                var list = document.getElementById('rooms-list');
+                list.innerHTML = '';
 
+                if (rooms.length === 0) {
+                    list.innerHTML = '<p style="color:#888; margin:0;">Nenhuma sala criada ainda. Crie a primeira!</p>';
+                    return;
+                }
+
+                rooms.forEach(room => {
+                    var div = document.createElement('div');
+                    div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;';
+                    div.innerHTML = `
+                        <div>
+                            <strong>${room.name}</strong>
+                            <small style="color:#888; display:block;">${room.description || ''}</small>
+                        </div>
+                        <button onclick="connectToRoom('${room.id}', '${room.name}')"
+                                style="width:auto; padding:6px 14px; margin:0; font-size:14px;">
+                            Entrar
+                        </button>`;
+                    list.appendChild(div);
+                });
+            });
+    }
+
+    // Cria uma nova sala via POST /rooms
+    function criarSala() {
+        var name = document.getElementById('newRoomName').value.trim();
+        var desc = document.getElementById('newRoomDesc').value.trim();
+
+        if (!name) { alert('Informe o nome da sala.'); return; }
+
+        fetch('/rooms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, description: desc })
+        }).then(res => {
+            if (res.ok) {
+                document.getElementById('newRoomName').value = '';
+                document.getElementById('newRoomDesc').value = '';
+                carregarSalas(); // atualiza a lista
+            } else {
+                res.json().then(err => alert('Erro: ' + JSON.stringify(err.errors)));
+            }
+        });
+    }
+
+    function connectToRoom(roomId, roomName) {
+        currentRoomId = roomId;
         if (currentSubscription !== null) currentSubscription.unsubscribe();
         document.getElementById('messages').innerHTML = '';
 
@@ -197,7 +257,7 @@
         stompClient.connect({}, function () {
             document.getElementById('room-step').classList.add('hidden');
             document.getElementById('chat-page').classList.remove('hidden');
-            document.getElementById('room-title').innerText = "Sala: " + currentRoomId;
+            document.getElementById('room-title').innerText = "Sala: " + roomName;
 
             // 1. Carrega o histórico salvo no Redis antes de escutar novas mensagens
             fetch('/messages/' + currentRoomId)
