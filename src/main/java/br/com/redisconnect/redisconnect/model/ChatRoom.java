@@ -1,8 +1,12 @@
 package br.com.redisconnect.redisconnect.model;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class ChatRoom {
 
     private String id;
