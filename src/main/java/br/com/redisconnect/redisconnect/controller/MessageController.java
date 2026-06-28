@@ -17,6 +17,7 @@ public class MessageController {
         this.chatService = chatService;
     }
 
+    // retorna o histórico de mensagens de uma sala
     @GetMapping("/{roomId}")
     public ResponseEntity<List<ChatMessage>> getHistory(@PathVariable String roomId) {
         return ResponseEntity.ok(chatService.getHistory(roomId));

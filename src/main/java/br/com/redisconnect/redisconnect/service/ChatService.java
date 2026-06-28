@@ -24,20 +24,18 @@ public class ChatService {
         this.objectMapper = objectMapper;
     }
 
+    // salva a mensagem no histórico e a publica no Pub/Sub
     public void send(ChatMessage message) {
         try {
-            // 1. Persiste no Redis List
             chatRepository.saveMessage(message);
-
-            // 2. Publica no Pub/Sub para os clientes conectados
             String json = objectMapper.writeValueAsString(message);
             redisPublisher.publish(json);
-
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Erro ao serializar mensagem no ChatService", e);
+            throw new RuntimeException("Erro ao serializar mensagem", e);
         }
     }
 
+    // retorna as últimas 50 mensagens da sala
     public List<ChatMessage> getHistory(String roomId) {
         return chatRepository.getHistory(roomId, 50);
     }
