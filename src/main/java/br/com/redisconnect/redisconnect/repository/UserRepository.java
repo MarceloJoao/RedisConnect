@@ -19,6 +19,10 @@ public class UserRepository {
     // Chave responsável por gerar IDs sequenciais.
     private static final String USER_ID_SEQUENCE = "user:id";
 
+    // Set que mantém todos os IDs de usuários cadastrados.
+    // Usado no findAll() para evitar o uso de KEYS *, que bloqueia o Redis.
+    private static final String USER_IDS_SET = "users:ids";
+
     // Responsável pela comunicação entre a aplicação e o Redis.
     private final StringRedisTemplate redisTemplate;
 
@@ -49,6 +53,10 @@ public class UserRepository {
                 PREFIX_EMAIL + user.getEmail(),
                 user.getId()
         );
+
+        // Registra o ID no Set global de usuários.
+        // Redis: SADD users:ids {id}
+        redisTemplate.opsForSet().add(USER_IDS_SET, user.getId());
     }
 
     public User findById(String id) {
@@ -85,20 +93,17 @@ public class UserRepository {
     }
 
     public List<User> findAll() {
-        //busca todas as chaves user
-        Set<String> keys = redisTemplate.keys(PREFIX_USER + "*");
+        // Busca os IDs a partir do Set dedicado.
+        // Redis: SMEMBERS users:ids
+        // Evita o uso de KEYS *, que varre todo o keyspace e bloqueia o Redis.
+        Set<String> ids = redisTemplate.opsForSet().members(USER_IDS_SET);
         List<User> users = new ArrayList<>();
 
-        if(keys == null) return users;
+        if (ids == null || ids.isEmpty()) return users;
 
-        for(String key : keys) {
-
-            if(USER_ID_SEQUENCE.equals(key)) continue;
-
-            String id = key.replace(PREFIX_USER, "");
+        for (String id : ids) {
             User user = findById(id);
-
-            if(user != null) users.add(user);
+            if (user != null) users.add(user);
         }
         return users;
     }
@@ -107,10 +112,18 @@ public class UserRepository {
 
         String key = PREFIX_USER + user.getId();
 
+        // Remove o índice do e-mail antigo antes de atualizar,
+        // evitando que índices órfãos fiquem acumulados no Redis.
+        User existing = findById(user.getId());
+        if (existing != null && !existing.getEmail().equals(user.getEmail())) {
+            redisTemplate.delete(PREFIX_EMAIL + existing.getEmail());
+        }
+
         redisTemplate.opsForHash().put(key, "name", user.getName());
         redisTemplate.opsForHash().put(key, "email", user.getEmail());
         redisTemplate.opsForHash().put(key, "password", user.getPassword());
 
+        // Cria (ou mantém) o índice com o e-mail atualizado.
         redisTemplate.opsForValue()
                 .set(PREFIX_EMAIL + user.getEmail(), user.getId());
     }
@@ -125,5 +138,9 @@ public class UserRepository {
 
         // Remove o índice por e-mail.
         redisTemplate.delete(PREFIX_EMAIL + user.getEmail());
+
+        // Remove o ID do Set global.
+        // Redis: SREM users:ids {id}
+        redisTemplate.opsForSet().remove(USER_IDS_SET, id);
     }
 }

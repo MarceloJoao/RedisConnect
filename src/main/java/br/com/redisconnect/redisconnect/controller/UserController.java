@@ -2,6 +2,8 @@ package br.com.redisconnect.redisconnect.controller;
 
 import br.com.redisconnect.redisconnect.model.User;
 import br.com.redisconnect.redisconnect.service.UserService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,9 +19,10 @@ public class UserController {
     }
 
     @PostMapping
-    public User save(@RequestBody User user) {
+    public ResponseEntity<User> save(@RequestBody User user) {
         userService.save(user);
-        return user;
+        // Retorna 201 Created
+        return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
     @GetMapping("/{id}")
@@ -51,13 +54,13 @@ public class UserController {
 
     // Endpoint responsável por validar o Login
     @PostMapping("/login")
-    public org.springframework.http.ResponseEntity<?> login(@RequestBody User loginData) {
+    public ResponseEntity<?> login(@RequestBody User loginData) {
         User user = userService.findByEmail(loginData.getEmail());
 
         if (user != null && user.getPassword().equals(loginData.getPassword())) {
-            return org.springframework.http.ResponseEntity.ok(user);
+            return ResponseEntity.ok(user);
         }
 
-        return org.springframework.http.ResponseEntity.status(401).body("E-mail ou senha incorretos.");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("E-mail ou senha incorretos.");
     }
 }
