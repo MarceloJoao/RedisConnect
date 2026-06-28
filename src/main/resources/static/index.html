@@ -2,34 +2,92 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RedisConnect - Autenticação e Chat</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        /* Adicionando box-sizing para evitar que o padding quebre a largura no mobile */
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f4f4f9;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 100%; /* Garante que ocupe a tela toda se for menor que 600px */
+        }
+
         .hidden { display: none; }
-        input { padding: 10px; margin: 8px 0; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold;}
+
+        input {
+            padding: 12px; /* Ligeiramente maior para facilitar o toque no celular */
+            margin: 8px 0;
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 12px 15px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 16px; /* Evita que o iPhone dê zoom automático ao clicar */
+        }
+
         button:hover { background: #218838; }
         .btn-danger { background: #dc3545; }
         .btn-danger:hover { background: #c82333; }
         .btn-primary { background: #007bff; }
         .btn-primary:hover { background: #0056b3; }
-        ul { list-style: none; padding: 0; min-height: 250px; border: 1px solid #ddd; background: #fafafa; border-radius: 4px; overflow-y: auto; margin-top: 15px;}
-        li { padding: 8px; border-bottom: 1px solid #eee; }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            height: 350px; /* Altura fixa para manter o chat com rolagem */
+            border: 1px solid #ddd;
+            background: #fafafa;
+            border-radius: 4px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        li { padding: 10px; border-bottom: 1px solid #eee; word-wrap: break-word; }
+
         .my-msg { color: #0056b3; font-weight: bold; }
         .error-msg { color: #dc3545; font-size: 0.9em; margin-top: -5px; margin-bottom: 10px; display: none; }
-        .link-text { color: #007bff; cursor: pointer; text-decoration: underline; font-size: 0.9em; text-align: center; display: block; margin-top: 15px; }
+        .link-text { color: #007bff; cursor: pointer; text-decoration: underline; font-size: 0.9em; text-align: center; display: block; margin-top: 15px; padding: 10px;}
+
+        /* --- AJUSTES ESPECÍFICOS PARA CELULAR --- */
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .container { padding: 15px; }
+            ul { height: 60vh; } /* No mobile, o chat ocupa 60% da altura da tela */
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 style="text-align: center;">RedisConnect</h2>
+    <h2 style="text-align: center; margin-top: 0;">RedisConnect</h2>
 
     <div id="login-step">
-        <h3>Faça seu Login</h3>
+        <h3 style="text-align: center;">Faça seu Login</h3>
         <input type="email" id="emailInput" placeholder="Seu E-mail" />
         <input type="password" id="passwordInput" placeholder="Sua Senha" />
         <span id="loginError" class="error-msg">E-mail ou senha incorretos!</span>
@@ -38,7 +96,7 @@
     </div>
 
     <div id="register-step" class="hidden">
-        <h3>Novo Cadastro</h3>
+        <h3 style="text-align: center;">Novo Cadastro</h3>
         <input type="text" id="regName" placeholder="Seu Nome Completo" />
         <input type="email" id="regEmail" placeholder="Seu E-mail" />
         <input type="password" id="regPassword" placeholder="Crie uma Senha" />
@@ -48,13 +106,13 @@
 
     <div id="room-step" class="hidden">
         <h3>Bem-vindo(a), <span id="displayUserName" style="color: #28a745;"></span>!</h3>
-        <label style="font-weight: bold;">Escolha o Tópico/Sala:</label>
+        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Escolha o Tópico/Sala:</label>
         <input type="text" id="roomId" placeholder="Ex: dev-java" />
         <button onclick="connectToRoom()">Conectar na Sala</button>
     </div>
 
     <div id="chat-page" class="hidden">
-        <h3 id="room-title"></h3>
+        <h3 id="room-title" style="margin-top: 0; text-align: center; color: #0056b3;"></h3>
         <ul id="messages"></ul>
         <input type="text" id="message" placeholder="Digite a mensagem..." onkeypress="handleEnter(event)" />
         <button onclick="sendMessage()">Enviar Mensagem</button>
@@ -133,6 +191,9 @@
 
         var socket = new SockJS('/ws');
         stompClient = Stomp.over(socket);
+        // Oculta os logs do Stomp no console para ficar mais limpo
+        stompClient.debug = null;
+
         stompClient.connect({}, function () {
             document.getElementById('room-step').classList.add('hidden');
             document.getElementById('chat-page').classList.remove('hidden');
@@ -150,6 +211,9 @@
         var chatMessage = { senderId: currentUsername, content: content, roomId: currentRoomId };
         stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
         document.getElementById('message').value = '';
+
+        // Mantém o foco no input após enviar para o teclado do celular não fechar
+        document.getElementById('message').focus();
     }
 
     function showMessage(msg) {
